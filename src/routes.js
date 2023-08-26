@@ -7,62 +7,113 @@ const database = new Database();
 export const routes = [
   {
     method: "GET",
-    path: buildRoutePath("/users"),
+    path: buildRoutePath("/tasks"),
     handler: (req, res) => {
       const { search } = req.query;
 
-      const users = database.select(
-        "users",
+      const tasks = database.select(
+        "tasks",
         search
           ? {
-              name: search,
-              email: search,
+              title: search,
+              description: search,
             }
           : null
       );
 
-      return res.end(JSON.stringify(users));
+      return res.end(JSON.stringify(tasks));
     },
   },
   {
     method: "POST",
-    path: buildRoutePath("/users"),
+    path: buildRoutePath("/tasks"),
     handler: (req, res) => {
-      const { name, email } = req.body;
+      const { title, description } = req.body;
 
-      const user = {
+      if (!title && !description) {
+        return res.writeHead(400).end();
+      }
+
+      const task = {
         id: randomUUID(),
-        name,
-        email,
+        title,
+        description,
+        created_at: new Date(),
+        updated_at: new Date(),
+        completed_at: null,
       };
 
-      database.insert("users", user);
+      database.insert("tasks", task);
 
       return res.writeHead(201).end();
     },
   },
   {
     method: "PUT",
-    path: buildRoutePath("/users/:id"),
+    path: buildRoutePath("/tasks/:id"),
     handler: (req, res) => {
       const { id } = req.params;
-      const { name, email } = req.body;
+      const { title, description } = req.body;
 
-      database.update("users", id, {
-        name,
-        email,
-      });
+      if (!title && !description) {
+        return res.writeHead(400).end();
+      }
+
+      let data = {};
+
+      if (title) {
+        data.title = title;
+      }
+
+      if (description) {
+        data.description = description;
+      }
+
+      data.updated_at = new Date();
+
+      try {
+        database.update("tasks", id, data);
+      } catch (error) {
+        return res.writeHead(404).end();
+      }
+
+      return res.writeHead(204).end();
+    },
+  },
+  {
+    method: "PATCH",
+    path: buildRoutePath("/tasks/:id/complete"),
+    handler: (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const task = database.selectById("tasks", id);
+
+        if (!(task instanceof Error)) {
+          database.update("tasks", id, {
+            completed_at: !!task.completed_at ? null : new Date(),
+          });
+        } else {
+          throw task;
+        }
+      } catch (error) {
+        return res.writeHead(404).end();
+      }
 
       return res.writeHead(204).end();
     },
   },
   {
     method: "DELETE",
-    path: buildRoutePath("/users/:id"),
+    path: buildRoutePath("/tasks/:id"),
     handler: (req, res) => {
       const { id } = req.params;
 
-      database.delete("users", id);
+      try {
+        database.delete("tasks", id);
+      } catch (error) {
+        return res.writeHead(404).end();
+      }
 
       return res.writeHead(204).end();
     },
